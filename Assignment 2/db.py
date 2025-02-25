@@ -1,5 +1,13 @@
 from pymongo import MongoClient
 
-client = MongoClient("mongodb+srv://sic6-405Found:XKsdbzPxxosoP00a@405foundsic6.rllhr.mongodb.net/?retryWrites=true&w=majority&appName=405FoundSIC6")
-db = client["MyDatabases"]
-collection = db["SensorData"]
+client = MongoClient("mongodb+srv://405Found-sic6:<db_password>@405found.9ibtc.mongodb.net/?appName=405Found")
+
+try:
+    client.admin.command('ping')
+    print("Pinged your deployment. You successfully connected to MongoDB!")
+except Exception as e:
+    print(e)
+    
+    
+db = client["MyDatabases"]  
+collection = db["SensorData"]  

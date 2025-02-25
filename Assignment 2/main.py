@@ -1,44 +1,52 @@
-from flask import Flask, request, jsonify
-from pymongo import MongoClient
-import requests
-import threading
+import network
+import urequests
+import utime
+from machine import Pin
+import dht
 
-app = Flask(__name__)
 
-# Konfigurasi Ubidots
-UBIDOTS_TOKEN = "BBUS-MClajoBNluAp2Bkkpj1eVLYzrX8LAU"
-UBIDOTS_URL = "https://industrial.api.ubidots.com/api/v1.6/devices/sic6-esp32ee"
+SSID = "esp32"
+PASSWORD = "none1234"
 
-# Fungsi background untuk Ubidots
-def send_to_ubidots_async(payload):
+station = network.WLAN(network.STA_IF)
+station.active(True)
+station.connect(SSID, PASSWORD)
+
+while not station.isconnected():
+    print("Menghubungkan ke WiFi...")
+    utime.sleep(1)
+
+print("Terhubung ke WiFi:", station.ifconfig())
+
+# Inisialisasi Sensor
+sensor_dht = dht.DHT11(Pin(5))
+sensor_pir = Pin(19, Pin.IN) 
+
+# Flask API URL
+url = "http://192.168.43.89:5000/sensor1"  
+while True:
     try:
-        headers = {"X-Auth-Token": UBIDOTS_TOKEN, "Content-Type": "application/json"}
-        response = requests.post(UBIDOTS_URL, json=payload, headers=headers, timeout=10)
-        print(f"Ubidots Status: {response.status_code}, Response: {response.text}")
+        # Baca Sensor 
+        sensor_dht.measure()
+        temperature = sensor_dht.temperature()
+        humidity = sensor_dht.humidity()
+        motion_detected = sensor_pir.value()  # 1 jika ada gerakan, 0 jika tidak
+
+        # Kirim Data
+        data = {
+            "temperature": temperature,
+            "humidity": humidity,
+            "motion": motion_detected 
+        }
+
+        print("Mengirim data:", data)
+        response = urequests.post(url, json=data)
+        print("Response:", response.text)
+        response.close()
+
     except Exception as e:
-        print("Error Ubidots:", e)
+        print("Error:", e)
 
-@app.route('/sensor1', methods=['POST'])
-def receive_sensor_data():
-    data = request.json
-    if not data or 'temperature' not in data or 'humidity' not in data or 'motion' not in data:
-        return jsonify({"error": "Data tidak lengkap"}), 400
-    
-    # Simpan ke MongoDB
-    try:
-        from db import collection
-        inserted = collection.insert_one(data)
-    except Exception as e:
-        print("MongoDB Error:", e)
-    
-    # Kirim ke Ubidots di background
-    threading.Thread(target=send_to_ubidots_async, args=(data,)).start()
-    
-    return jsonify({"message": "Data diterima"}), 200  # Respon cepat ke ESP32
+    utime.sleep(5) 
 
-@app.route('/test', methods=['GET'])
-def test_connection():
-    return jsonify({"status": "ok", "message": "Server aktif!"}), 200
 
-if __name__ == '__main__':
-    app.run(debug=True, host="0.0.0.0", port=5050)

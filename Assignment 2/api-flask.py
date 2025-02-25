@@ -26,11 +26,7 @@ def receive_sensor_data():
         "humidity": humidity,
         "motion": motion  
     }
-    try:
-        inserted_id = collection.insert_one(new_data).inserted_id
-    except Exception as e:
-        print(f"Error MongoDB: {str(e)}")  # Log error
-        return jsonify({"error": "Gagal menyimpan data ke database"}), 500
+    inserted_id = collection.insert_one(new_data).inserted_id  
 
     
     ubidots_payload = {
@@ -47,9 +43,9 @@ def receive_sensor_data():
     response = requests.post(UBIDOTS_URL, json=ubidots_payload, headers=headers)
     
     if response.status_code == 200 or response.status_code == 201:
-        return jsonify({"message": "Data berhasil dikirim ke Ubidots"}), 200
+        return jsonify({"message": "Data terkirim Ubidots"}), 200
     else:
-        return jsonify({"message": "Gagal mengirim data ke Ubidots", "error": response.text}), 500
+        return jsonify({"message": "Data gagal terkirim ke Ubidots", "error": response.text}), 500
 
 
 @app.route('/sensor1', methods=['GET'])
