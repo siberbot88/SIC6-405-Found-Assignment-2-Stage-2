@@ -1,6 +1,6 @@
 from pymongo import MongoClient
 
-client = MongoClient("mongodb+srv://405Found-sic6:<db_password>@405found.9ibtc.mongodb.net/?appName=405Found")
+client = MongoClient("mongodb+srv://405Found-sic6:o4qL4fslJVAsoomm@405found.9ibtc.mongodb.net/?appName=405Found")
 
 try:
     client.admin.command('ping')
