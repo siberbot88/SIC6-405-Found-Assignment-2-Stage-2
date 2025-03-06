@@ -17,12 +17,11 @@ while not station.isconnected():
 
 print("Terhubung ke WiFi:", station.ifconfig())
 
-# Inisialisasi Sensor dan Aktuator
+# Inisialisasi Sensor
 sensor_dht = dht.DHT11(Pin(5))
 sensor_pir = Pin(19, Pin.IN)
 sensor_ldr = ADC(Pin(34))
 sensor_ldr.atten(ADC.ATTN_11DB)
-buzzer = Pin(21, Pin.OUT)
 
 # Inisialisasi LED
 led_yellow = Pin(2, Pin.OUT)
@@ -41,14 +40,13 @@ debounce_time = 200
 # Variabel timing
 last_ldr_time = 0
 last_dht_time = 0
-ldr_interval = 500
-dht_interval = 5000
+ldr_interval = 500  # 0.5 detik
+dht_interval = 5000  # 5 detik
 
 # Variabel penyimpanan data
 current_temp = 0
 current_hum = 0
 current_motion = 0
-current_status = "suhu aman"
 
 def button_pressed(pin):
     global system_active, last_press_time
@@ -60,6 +58,7 @@ def button_pressed(pin):
 
 button.irq(trigger=Pin.IRQ_RISING, handler=button_pressed)
 
+# Flask API URL
 url = "http://192.168.43.89:5000/sensor1"
 
 def control_leds(ldr_value):
@@ -75,25 +74,16 @@ while True:
         try:
             now = utime.ticks_ms()
             
-            # Update sensor DHT dan kontrol buzzer
+            # Update sensor DHT dan PIR setiap 5 detik
             if utime.ticks_diff(now, last_dht_time) >= dht_interval:
                 sensor_dht.measure()
                 current_temp = sensor_dht.temperature()
                 current_hum = sensor_dht.humidity()
                 current_motion = sensor_pir.value()
-                
-                # Kontrol buzzer dan status
-                if current_temp > 32:
-                    buzzer.on()
-                    current_status = "suhu tinggi"
-                else:
-                    buzzer.off()
-                    current_status = "suhu aman"
-                
                 last_dht_time = now
                 print("Memperbarui data DHT/PIR")
             
-            # Pembacaan dan pengiriman data LDR
+            # Update dan kirim data LDR setiap 0.5 detik
             if utime.ticks_diff(now, last_ldr_time) >= ldr_interval:
                 ldr_value = sensor_ldr.read()
                 control_leds(ldr_value)
@@ -102,22 +92,20 @@ while True:
                     "temperature": current_temp,
                     "humidity": current_hum,
                     "motion": current_motion,
-                    "ldr": ldr_value,
-                    "status": current_status
+                    "ldr": ldr_value
                 }
                 
-                print("Mengirim data:", data)
+                print("Mengirim data LDR:", ldr_value)
                 response = urequests.post(url, json=data)
                 response.close()
                 last_ldr_time = now
                 
-            utime.sleep_ms(50)
+            utime.sleep_ms(50)  # Mengurangi beban CPU
             
         except Exception as e:
             print("Error:", e)
             utime.sleep(1)
     else:
-        buzzer.off()
         led_yellow.off()
         led_red.off()
         utime.sleep(0.1)

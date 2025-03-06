@@ -6,63 +6,69 @@ import requests
 
 app = Flask(__name__)
 
-UBIDOTS_TOKEN = "BBUS-KBGoN2Efxyadt5RaZLzKhMiSR4zxqU"  
-UBIDOTS_DEVICE_LABEL = "v1.6/devices/si6-405-found/"  
+UBIDOTS_TOKEN = "BBUS-KBGoN2Efxyadt5RaZLzKhMiSR4zxqU"
+UBIDOTS_DEVICE_LABEL = "v1.6/devices/si6-405-found/"
 UBIDOTS_URL = f"https://industrial.api.ubidots.com/api/v1.6/devices/si6-405-found/"
 
 
 @app.route('/sensor1', methods=['POST'])
 def receive_sensor_data():
     data = request.json
-    temperature = data.get("temperature")
-    humidity = data.get("humidity")
-    motion = data.get("motion")  
-
-    if temperature is None or humidity is None or motion is None:
+    required_fields = ["temperature", "humidity", "motion", "ldr", "status"]
+    
+    if not all(field in data for field in required_fields):
         return jsonify({"error": "Data tidak lengkap"}), 400
 
+    # Data untuk MongoDB
     new_data = {
-        "temperature": temperature,
-        "humidity": humidity,
-        "motion": motion  
+        "temperature": data["temperature"],
+        "humidity": data["humidity"],
+        "motion": data["motion"],
+        "ldr": data["ldr"],
+        "status": data["status"]
     }
-    inserted_id = collection.insert_one(new_data).inserted_id  
-
     
+    # Data untuk Ubidots (tanpa status)
     ubidots_payload = {
-        "temperature": temperature,
-        "humidity": humidity,
-        "motion": motion  
+        "temperature": data["temperature"],
+        "humidity": data["humidity"],
+        "motion": data["motion"],
+        "ldr": data["ldr"]
     }
     
-    headers = {
-        "Content-Type": "application/json",
-        "X-Auth-Token": UBIDOTS_TOKEN
-    }
-
-    response = requests.post(UBIDOTS_URL, json=ubidots_payload, headers=headers)
+    # Simpan ke MongoDB
+    try:
+        collection.insert_one(new_data)
+    except Exception as e:
+        print("Error MongoDB:", e)
     
-    if response.status_code == 200 or response.status_code == 201:
-        return jsonify({"message": "Data terkirim Ubidots"}), 200
-    else:
-        return jsonify({"message": "Data gagal terkirim ke Ubidots", "error": response.text}), 500
-
+    # Kirim ke Ubidots
+    headers = {"X-Auth-Token": UBIDOTS_TOKEN, "Content-Type": "application/json"}
+    try:
+        response = requests.post(UBIDOTS_URL, json=ubidots_payload, headers=headers)
+        if response.status_code in [200, 201]:
+            return jsonify({"message": "Data terkirim ke semua sistem"}), 200
+        else:
+            return jsonify({"error": "Gagal ke Ubidots", "detail": response.text}), 500
+    except Exception as e:
+        return jsonify({"error": "Koneksi Ubidots gagal", "detail": str(e)}), 500
 
 @app.route('/sensor1', methods=['GET'])
 def get_all_data():
-    all_data = collection.find()  
+    all_data = collection.find()
     result = []
-
-    for data in all_data:
-        result.append({
-            "id": str(data["_id"]),
-            "temperature": data.get("temperature", "N/A"),  
-            "humidity": data.get("humidity", "N/A"),
-            "motion": data.get("motion", "N/A")  
-        })
-
+    
+    for doc in all_data:
+        doc_data = {
+            "id": str(doc["_id"]),
+            "temperature": doc.get("temperature", "N/A"),
+            "humidity": doc.get("humidity", "N/A"),
+            "motion": doc.get("motion", "N/A"),
+            "ldr": doc.get("ldr", "N/A")
+        }
+        result.append(doc_data)
+    
     return jsonify(result), 200
 
 if __name__ == '__main__':
     app.run(debug=True, host="0.0.0.0")
-

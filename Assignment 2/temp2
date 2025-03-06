@@ -1,0 +1,74 @@
+import network
+import urequests
+import utime
+from machine import Pin, Timer
+import dht
+
+SSID = "esp32"
+PASSWORD = "none1234"
+
+station = network.WLAN(network.STA_IF)
+station.active(True)
+station.connect(SSID, PASSWORD)
+
+while not station.isconnected():
+    print("Menghubungkan ke WiFi...")
+    utime.sleep(1)
+
+print("Terhubung ke WiFi:", station.ifconfig())
+
+# Inisialisasi Sensor
+sensor_dht = dht.DHT11(Pin(5))
+sensor_pir = Pin(19, Pin.IN)
+
+# Inisialisasi Tombol dan LED
+button = Pin(18, Pin.IN, Pin.PULL_DOWN)
+led = Pin(4, Pin.OUT)
+system_active = False  # Status awal sistem mati
+led.value(system_active)  # Matikan LED awal
+
+# Variabel debouncing
+last_press_time = 0
+debounce_time = 200  # waktu debounce dalam milidetik
+
+def button_pressed(pin):
+    global system_active, last_press_time
+    current_time = utime.ticks_ms()
+    if utime.ticks_diff(current_time, last_press_time) >= debounce_time:
+        system_active = not system_active
+        led.value(system_active)
+        last_press_time = current_time
+
+# Setup interrupt untuk tombol
+button.irq(trigger=Pin.IRQ_RISING, handler=button_pressed)
+
+# Flask API URL
+url = "http://192.168.43.89:5000/sensor1"
+
+while True:
+    if system_active:
+        try:
+            # Baca Sensor
+            sensor_dht.measure()
+            temperature = sensor_dht.temperature()
+            humidity = sensor_dht.humidity()
+            motion_detected = sensor_pir.value()
+
+            # Kirim Data
+            data = {
+                "temperature": temperature,
+                "humidity": humidity,
+                "motion": motion_detected
+            }
+
+            print("Mengirim data:", data)
+            response = urequests.post(url, json=data)
+            print("Response:", response.text)
+            response.close()
+
+            utime.sleep(5)
+        except Exception as e:
+            print("Error:", e)
+            utime.sleep(5)
+    else:
+        utime.sleep(0.1)  # Sleep lebih pendek saat sistem tidak aktif
