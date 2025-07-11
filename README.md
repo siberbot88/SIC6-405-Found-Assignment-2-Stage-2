@@ -110,6 +110,6 @@ Meskipun kami tidak berhasil sampai tahap akhir, kami membawa pulang banyak peng
 
 ## 📬 Contact
 
-> Untuk pertanyaan, kolaborasi, atau diskusi lebih lanjut, hubungi kami melalui [LinkedIn / Email] *(Opsional jika ingin ditambahkan)*
+> Untuk pertanyaan, kolaborasi, atau diskusi lebih lanjut, hubungi kami melalui mohammadbayurizki22@gmail.com.
 
 
